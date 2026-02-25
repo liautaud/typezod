@@ -1,7 +1,7 @@
 {
   "name": "@liautaud/typezod",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Zod-like DSL for comparing TypeScript compiler types against user-defined schemas",
   "author": "Romain Liautaud",
   "license": "MIT",
