@@ -85,37 +85,37 @@ export const t = {
   /** Represents the `number` type. */
   number: (): TypeSchema =>
     schema((type, { checker }) =>
-      checker.isTypeAssignableTo(type, checker.getNumberType())
+      checker.isTypeAssignableTo(type, checker.getNumberType()),
     ),
 
   /** Represents the `string` type. */
   string: (): TypeSchema =>
     schema((type, { checker }) =>
-      checker.isTypeAssignableTo(type, checker.getStringType())
+      checker.isTypeAssignableTo(type, checker.getStringType()),
     ),
 
   /** Represents the `boolean` type. */
   boolean: (): TypeSchema =>
     schema((type, { checker }) =>
-      checker.isTypeAssignableTo(type, checker.getBooleanType())
+      checker.isTypeAssignableTo(type, checker.getBooleanType()),
     ),
 
   /** Represents the `void` type. */
   void: (): TypeSchema =>
     schema((type, { checker }) =>
-      checker.isTypeAssignableTo(type, checker.getVoidType())
+      checker.isTypeAssignableTo(type, checker.getVoidType()),
     ),
 
   /** Represents the `undefined` type. */
   undefined: (): TypeSchema =>
     schema((type, { checker }) =>
-      checker.isTypeAssignableTo(type, checker.getUndefinedType())
+      checker.isTypeAssignableTo(type, checker.getUndefinedType()),
     ),
 
   /** Represents the `null` type. */
   null: (): TypeSchema =>
     schema((type, { checker }) =>
-      checker.isTypeAssignableTo(type, checker.getNullType())
+      checker.isTypeAssignableTo(type, checker.getNullType()),
     ),
 
   /**
@@ -162,7 +162,7 @@ export const t = {
 
         const propType = ctx.checker.getTypeOfSymbol(propSymbol);
         return propSchema._accepts(propType, ctx);
-      })
+      }),
     ),
 
   /**
@@ -195,7 +195,7 @@ export const t = {
     schema((type, ctx) => {
       if (type.isUnion()) {
         return type.types.every((member) =>
-          members.some((m) => m._accepts(member, ctx))
+          members.some((m) => m._accepts(member, ctx)),
         );
       }
       return members.some((m) => m._accepts(type, ctx));
@@ -239,7 +239,7 @@ export const t = {
     schema((type, { checker, program }) => {
       if (!program) {
         throw new Error(
-          "t.fromModule() requires `program` in the SchemaContext."
+          "t.fromModule() requires `program` in the SchemaContext.",
         );
       }
 
@@ -271,7 +271,7 @@ export const t = {
       const targetType = cache.get(cacheKey);
       if (targetType == null) {
         throw new Error(
-          `t.fromModule(): could not resolve export "${exportName}" from any module matching "${modulePathPattern}".`
+          `t.fromModule(): could not resolve export "${exportName}" from any module matching "${modulePathPattern}".`,
         );
       }
       return checker.isTypeAssignableTo(type, targetType);
@@ -298,7 +298,7 @@ export const t = {
 export function isAssignableTo(
   ctx: SchemaContext,
   type: Type,
-  schema: TypeSchema
+  schema: TypeSchema,
 ): boolean {
   return schema._accepts(type, ctx);
 }

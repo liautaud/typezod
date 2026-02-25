@@ -1,4 +1,4 @@
-node_modules/
-package-lock.json
-dist/
-*.tsbuildinfo
+node_modules
+dist
+*.log
+.DS_Store

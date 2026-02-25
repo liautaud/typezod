@@ -1,13 +1,17 @@
 {
   "name": "@liautaud/typezod",
+  "type": "module",
   "version": "1.0.0",
   "description": "Zod-like DSL for comparing TypeScript compiler types against user-defined schemas",
-  "type": "module",
-  "license": "MIT",
   "author": "Romain Liautaud",
+  "license": "MIT",
+  "homepage": "https://github.com/liautaud/typezod#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/liautaud/typezod.git"
+  },
+  "bugs": {
+    "url": "https://github.com/liautaud/typezod/issues"
   },
   "keywords": [
     "typescript",
@@ -32,16 +36,19 @@
   },
   "scripts": {
     "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
     "prepublishOnly": "npm test && npm run build"
   },
   "peerDependencies": {
     "typescript": ">=5.0.0"
   },
   "devDependencies": {
-    "tsdown": "^0.11.9",
+    "@types/node": "^25.0.3",
+    "prettier": "^3.8.1",
+    "tsdown": "^0.18.1",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.16"
   }
 }

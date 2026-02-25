@@ -1,7 +1,7 @@
 import ts from "typescript";
 import { describe, expect, test } from "vitest";
 
-import { t, isAssignableTo, type SchemaContext } from "./index.ts";
+import { t, isAssignableTo, type SchemaContext } from "../src/index.ts";
 
 /**
  * Test harness: compiles a TypeScript snippet in-memory and returns typed
@@ -260,7 +260,9 @@ describe("t.intersection()", () => {
   });
 
   test("rejects when one schema is not satisfied", () => {
-    expect(isAssignableTo(ctx, getTypeOf("nameOnly"), NamedAndAged)).toBe(false);
+    expect(isAssignableTo(ctx, getTypeOf("nameOnly"), NamedAndAged)).toBe(
+      false,
+    );
   });
 });
 
@@ -305,18 +307,26 @@ describe("t.fromModule()", () => {
 
   test("matches a type resolved from a module", () => {
     const TypeCheckerSchema = t.fromModule("/typescript/", "TypeChecker");
-    expect(isAssignableTo(ctx, getTypeOf("checker"), TypeCheckerSchema)).toBe(true);
+    expect(isAssignableTo(ctx, getTypeOf("checker"), TypeCheckerSchema)).toBe(
+      true,
+    );
   });
 
   test("rejects a type not assignable to the resolved type", () => {
     const TypeCheckerSchema = t.fromModule("/typescript/", "TypeChecker");
-    expect(isAssignableTo(ctx, getTypeOf("notChecker"), TypeCheckerSchema)).toBe(false);
+    expect(
+      isAssignableTo(ctx, getTypeOf("notChecker"), TypeCheckerSchema),
+    ).toBe(false);
   });
 
   test("different exports resolve independently", () => {
     const SourceFileSchema = t.fromModule("/typescript/", "SourceFile");
-    expect(isAssignableTo(ctx, getTypeOf("sourceFile"), SourceFileSchema)).toBe(true);
-    expect(isAssignableTo(ctx, getTypeOf("notChecker"), SourceFileSchema)).toBe(false);
+    expect(isAssignableTo(ctx, getTypeOf("sourceFile"), SourceFileSchema)).toBe(
+      true,
+    );
+    expect(isAssignableTo(ctx, getTypeOf("notChecker"), SourceFileSchema)).toBe(
+      false,
+    );
   });
 
   test("throws when program is not provided", () => {
@@ -329,14 +339,16 @@ describe("t.fromModule()", () => {
 
   test("throws for non-existent export", () => {
     const Nonexistent = t.fromModule("/typescript/", "DoesNotExist");
-    expect(() => isAssignableTo(ctx, getTypeOf("checker"), Nonexistent)).toThrow(
-      'could not resolve export "DoesNotExist"',
-    );
+    expect(() =>
+      isAssignableTo(ctx, getTypeOf("checker"), Nonexistent),
+    ).toThrow('could not resolve export "DoesNotExist"');
   });
 
   test("throws for non-existent module", () => {
     const Nonexistent = t.fromModule("/no-such-module/", "Foo");
-    expect(() => isAssignableTo(ctx, getTypeOf("checker"), Nonexistent)).toThrow(
+    expect(() =>
+      isAssignableTo(ctx, getTypeOf("checker"), Nonexistent),
+    ).toThrow(
       'could not resolve export "Foo" from any module matching "/no-such-module/"',
     );
   });
