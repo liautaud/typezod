@@ -1,14 +1,27 @@
-import type { TypeChecker, Type, Program, SymbolFlags } from "typescript";
+import ts, {
+  type TypeChecker,
+  type Type,
+  type Program,
+  type SymbolFlags,
+  type SourceFile,
+} from "typescript";
 
 const TS_SYMBOL_FLAGS_OPTIONAL = 16777216 satisfies SymbolFlags.Optional;
 
 /**
- * Context required by all schema checks. The `program` field is only needed
- * for schemas that resolve types from external modules ({@link t.fromModule}).
+ * Context required by all schema checks.
+ *
+ * `program` is required by schemas that resolve module exports
+ * ({@link t.fromModule}).
+ *
+ * `sourceFile` is only required when resolving relative module specifiers
+ * (`"./x"`, `"../x"`) with {@link t.fromModule}. It should be the source file
+ * currently being analyzed.
  */
 export type SchemaContext = {
   checker: TypeChecker;
   program?: Program;
+  sourceFile?: SourceFile;
 };
 
 type AcceptsFn = (type: Type, ctx: SchemaContext) => boolean;
@@ -75,8 +88,18 @@ export class TypeSchema {
 
 const schema = (check: AcceptsFn): TypeSchema => new TypeSchema(check);
 
-// Per-checker cache for `t.fromModule()` resolved types.
-const moduleTypeCache = new WeakMap<TypeChecker, Map<string, Type | null>>();
+/**
+ * Returns `true` if the given TypeScript type is assignable to the schema–in
+ * other words, if `type extends T` with `T` the TypeScript type represented
+ * by the schema.
+ */
+export function isAssignableTo(
+  ctx: SchemaContext,
+  type: Type,
+  schema: TypeSchema,
+): boolean {
+  return schema._accepts(type, ctx);
+}
 
 /**
  * Schema builder namespace.
@@ -217,29 +240,38 @@ export const t = {
     schema((type, ctx) => members.every((m) => m._accepts(type, ctx))),
 
   /**
-   * Represents a type exported from a module in the program. Resolves a genuine
-   * `ts.Type` and delegates to `checker.isTypeAssignableTo()`, so it handles
-   * nominal class hierarchies correctly.
+   * Represents a type exported from a module. Resolves the module using
+   * TypeScript's module resolution algorithm, with a fallback to ambient
+   * module declarations. Resolved types are cached per `TypeChecker` instance.
    *
-   * Resolved types are cached per `TypeChecker` instance (via a `WeakMap`) so
-   * repeated calls across files do not re-scan source files.
+   * Requires `program` in the {@link SchemaContext}. Relative specifiers
+   * (`"./x"`, `"../x"`) also require `sourceFile`.
    *
-   * Requires `program` in the {@link SchemaContext}.
-   *
-   * @param modulePathPattern Substring matched against source-file paths.
+   * @param moduleName The module specifier, as in an `import` statement.
    * @param exportName The exported type, class or interface name.
    *
    * @example
    * ```typescript
-   * const BaseWindow = t.fromModule("/electron/", "BaseWindow");
-   * const Buffer = t.fromModule("@types/node", "Buffer");
+   * const BaseWindow = t.fromModule("electron", "BaseWindow");
+   * const Buffer = t.fromModule("node:buffer", "Buffer");
    * ```
+   *
+   * @throws When `program` is missing from the context.
+   * @throws When `moduleName` is relative and `sourceFile` is missing.
+   * @throws When no export named `exportName` can be resolved from `moduleName`.
    */
-  fromModule: (modulePathPattern: string, exportName: string): TypeSchema =>
-    schema((type, { checker, program }) => {
+  fromModule: (moduleName: string, exportName: string): TypeSchema =>
+    schema((type, { checker, program, sourceFile }) => {
       if (!program) {
         throw new Error(
           "t.fromModule() requires `program` in the SchemaContext.",
+        );
+      }
+      const isRelative =
+        moduleName.startsWith("./") || moduleName.startsWith("../");
+      if (isRelative && !sourceFile) {
+        throw new Error(
+          "t.fromModule() requires `sourceFile` in the SchemaContext for relative module specifiers.",
         );
       }
 
@@ -249,29 +281,29 @@ export const t = {
         moduleTypeCache.set(checker, cache);
       }
 
-      const cacheKey = JSON.stringify([modulePathPattern, exportName]);
+      const cacheKey = JSON.stringify([
+        moduleName,
+        exportName,
+        isRelative ? sourceFile!.fileName : null,
+      ]);
 
       if (!cache.has(cacheKey)) {
-        let resolved: Type | null = null;
-        for (const sourceFile of program.getSourceFiles()) {
-          if (!sourceFile.fileName.includes(modulePathPattern)) continue;
-          const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
-          if (!moduleSymbol) continue;
-          const exportSymbol = checker
-            .getExportsOfModule(moduleSymbol)
-            .find((s) => s.getName() === exportName);
-          if (exportSymbol) {
-            resolved = checker.getDeclaredTypeOfSymbol(exportSymbol);
-            break;
-          }
-        }
-        cache.set(cacheKey, resolved);
+        cache.set(
+          cacheKey,
+          resolveModuleType(
+            checker,
+            program,
+            moduleName,
+            exportName,
+            sourceFile,
+          ),
+        );
       }
 
       const targetType = cache.get(cacheKey);
       if (targetType == null) {
         throw new Error(
-          `t.fromModule(): could not resolve export "${exportName}" from any module matching "${modulePathPattern}".`,
+          `t.fromModule(): could not resolve export "${exportName}" from module "${moduleName}".`,
         );
       }
       return checker.isTypeAssignableTo(type, targetType);
@@ -290,15 +322,60 @@ export const t = {
   custom: (predicate: AcceptsFn): TypeSchema => schema(predicate),
 };
 
+/** Per-checker cache for `t.fromModule()` resolved types. */
+const moduleTypeCache = new WeakMap<TypeChecker, Map<string, Type | null>>();
+
 /**
- * Returns `true` if the given TypeScript type is assignable to the schema–in
- * other words, if `type extends T` with `T` the TypeScript type represented
- * by the schema.
+ * Resolves a module's exported type using TypeScript's module resolution
+ * algorithm, with a fallback to ambient module declarations.
+ *
+ * Returns the resolved `ts.Type`, or `null` if the export cannot be found.
+ *
+ * @throws When multiple ambient/resolved symbols yield different types for the
+ * same export name (ambiguity).
  */
-export function isAssignableTo(
-  ctx: SchemaContext,
-  type: Type,
-  schema: TypeSchema,
-): boolean {
-  return schema._accepts(type, ctx);
-}
+const resolveModuleType = (
+  checker: TypeChecker,
+  program: Program,
+  moduleName: string,
+  exportName: string,
+  sourceFile?: SourceFile,
+): Type | null => {
+  const compilerOptions = program.getCompilerOptions();
+  const containingFile = sourceFile
+    ? sourceFile.fileName
+    : program.getCurrentDirectory() + "/__typezod__.ts";
+
+  let moduleSymbol: ts.Symbol | undefined;
+
+  const resolved = ts.resolveModuleName(
+    moduleName,
+    containingFile,
+    compilerOptions,
+    ts.sys,
+  );
+  if (resolved.resolvedModule) {
+    const resolvedSf = program.getSourceFile(
+      resolved.resolvedModule.resolvedFileName,
+    );
+    if (resolvedSf) {
+      moduleSymbol = checker.getSymbolAtLocation(resolvedSf);
+    }
+  }
+
+  if (!moduleSymbol) {
+    const quotedName = `"${moduleName}"`;
+    moduleSymbol = checker
+      .getAmbientModules()
+      .find((s) => s.getName() === quotedName);
+  }
+
+  if (!moduleSymbol) return null;
+
+  const exportSymbol = checker
+    .getExportsOfModule(moduleSymbol)
+    .find((s) => s.getName() === exportName);
+  if (!exportSymbol) return null;
+
+  return checker.getDeclaredTypeOfSymbol(exportSymbol);
+};

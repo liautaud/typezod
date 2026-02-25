@@ -27,7 +27,7 @@ const Rectangle = t.object({
   height: t.number(),
 });
 
-const ElectronWindow = t.fromModule("/electron/", "BaseWindow");
+const ElectronWindow = t.fromModule("electron", "BaseWindow");
 
 // Inside a typescript-eslint rule's `create()` function, build a context
 // from the parser services and use `isAssignableTo` to check types.
@@ -51,36 +51,55 @@ by the schema.
 ### `SchemaContext`
 
 The context object passed to `isAssignableTo`. Contains a `checker`
-(required) and an optional `program` (only needed for `t.fromModule()`).
+(always required), a `program` (required when using `t.fromModule()`),
+and a `sourceFile` (required when using `t.fromModule()` with a relative
+module specifier such as `"./foo"` or `"../foo"`).
+
+Example for relative module specifiers inside an ESLint rule:
+
+```typescript
+const tsNode = parserServices.esTreeNodeToTSNodeMap.get(node);
+const ctx: SchemaContext = {
+  checker: parserServices.program.getTypeChecker(),
+  program: parserServices.program,
+  sourceFile: tsNode.getSourceFile(),
+};
+```
 
 ### Primitives
 
-| Builder          | Description                    |
-| ---------------- | ------------------------------ |
-| `t.string()`     | Represents the `string` type   |
-| `t.number()`     | Represents the `number` type   |
-| `t.boolean()`    | Represents the `boolean` type  |
-| `t.void()`       | Represents the `void` type     |
-| `t.undefined()`  | Represents the `undefined` type|
-| `t.null()`       | Represents the `null` type     |
-| `t.any()`        | Accepts any type               |
-| `t.unknown()`    | Accepts any type               |
+| Builder         | Description                     |
+| --------------- | ------------------------------- |
+| `t.string()`    | Represents the `string` type    |
+| `t.number()`    | Represents the `number` type    |
+| `t.boolean()`   | Represents the `boolean` type   |
+| `t.void()`      | Represents the `void` type      |
+| `t.undefined()` | Represents the `undefined` type |
+| `t.null()`      | Represents the `null` type      |
+| `t.any()`       | Accepts any type                |
+| `t.unknown()`   | Accepts any type                |
 
 ### Combinators
 
-| Builder                    | Description                                                      |
-| -------------------------- | ---------------------------------------------------------------- |
-| `t.object(shape)`          | Represents an object with the given shape (structural subtyping) |
-| `t.array(element)`         | Represents an array whose element satisfies the given schema     |
-| `t.union(...schemas)`      | Represents a union of the given schemas                          |
-| `t.intersection(...schemas)` | Represents an intersection of the given schemas                |
+| Builder                      | Description                                                      |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `t.object(shape)`            | Represents an object with the given shape (structural subtyping) |
+| `t.array(element)`           | Represents an array whose element satisfies the given schema     |
+| `t.union(...schemas)`        | Represents a union of the given schemas                          |
+| `t.intersection(...schemas)` | Represents an intersection of the given schemas                  |
 
 ### Advanced
 
-| Builder                                 | Description                                             |
-| --------------------------------------- | ------------------------------------------------------- |
-| `t.fromModule(pathPattern, exportName)` | Represents a type exported from a module in the program |
-| `t.custom(fn)`                          | Escape hatch for arbitrary predicates                   |
+| Builder                                | Description                                             |
+| -------------------------------------- | ------------------------------------------------------- |
+| `t.fromModule(moduleName, exportName)` | Represents a type exported from a module in the program |
+| `t.custom(fn)`                         | Escape hatch for arbitrary predicates                   |
+
+`t.fromModule()` accepts the same module specifier you'd write in an `import` statement.
+Installed packages (`"typescript"`, `"electron"`), relative paths (`"./types"`,
+`"../shared/types"`), and ambient module declarations (`declare module '...'`) are
+all supported. Relative specifiers require `sourceFile` in the context. Throws if the
+module or export cannot be found.
 
 ### Modifiers
 
