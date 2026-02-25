@@ -3,7 +3,19 @@
   "version": "1.0.0",
   "description": "Zod-like DSL for comparing TypeScript compiler types against user-defined schemas",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "author": "Romain Liautaud",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liautaud/typezod.git"
+  },
+  "keywords": [
+    "typescript",
+    "type-checking",
+    "type-aware-linting",
+    "typescript-eslint",
+    "zod"
+  ],
   "exports": {
     ".": {
       "import": "./dist/index.mjs",
@@ -15,10 +27,14 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "provenance": true
+  },
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "npm test && npm run build"
   },
   "peerDependencies": {
     "typescript": ">=5.0.0"
